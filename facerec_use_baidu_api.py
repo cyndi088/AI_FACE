@@ -14,7 +14,7 @@ from PIL import Image
 # pip install requests
 # pip install baidu-aip
 
-HTTP_ENABLE = True  # True #False
+HTTP_ENABLE = True  # True or False
 EXIT_ON_HTTP_ERROR = True
 HTTP_TIMEOUT = 5
 RESIZE_WIDTH = 1600
@@ -122,12 +122,6 @@ def upload_info_to_server(url, file_url, dev_no, token, people_str,best_pic_file
                           changingQualified, score, color_b, color_g, color_r, color_str,
                           face_x, face_y, face_w, face_h, body_x, body_y, body_w, body_h,
                           suit_x, suit_y, suit_w, suit_h, status, sequence):
-    # print('upload_info_to_server: url %s, file_url %s, dev_no %s, token %s, best_pic_file_name %s, score %f color_b %s,'
-    #       ' color_g %s, color_r %s, color %s face_x %s, face_y %s, face_w %s, face_h %s, '
-    #       'body_x %s, body_y %s, body_w %s, body_h %s, suit_x %s, suit_y %s, suit_w %s, suit_h %s, '
-    #       'status %d, sequence %d' % (url, file_url, dev_no, token, best_pic_file_name, score,
-    #                                   color_b, color_g, color_r, color_str, face_x, face_y, face_w, face_h,
-    #                                   body_x, body_y, body_w, body_h, suit_x, suit_y, suit_w, suit_h, status, sequence))
     ret = False
     payload = {'devNo': dev_no, 'token': token, 'sampleTime': people_str, 'faceQualified': faceQualified,
            'qualifiedUser': qualifiedUser, 'changingQualified': changingQualified, 'score': score,
@@ -151,7 +145,7 @@ def upload_info_to_server(url, file_url, dev_no, token, people_str,best_pic_file
 
                 payload = {"file": upload_file_name}
                 current_path = os.getcwd()
-                cache_path = current_path + '\\cache\\'
+                cache_path = current_path + '\\cache\\'  # 将"cache"中的缩略图上传
                 files = {
                     "file": open(cache_path+upload_file_name, "rb")
                 }
@@ -173,11 +167,8 @@ def upload_info_to_server(url, file_url, dev_no, token, people_str,best_pic_file
         print(e)
     finally:
         pass
-        # current_path = os.getcwd()
-        # cache_path = current_path + '\\cache'
-        # shutil.move(upload_file_name, cache_path)
         # time.sleep(0.5)
-        # os.remove(upload_file_name)
+        # os.remove(upload_file_name)  # 清缓存
     return ret
 
 
@@ -219,11 +210,8 @@ def copy_file(src_file, dst_file, width, height, quality):
         im = Image.open(src_file)
         # im.resize((width, height), Image.ANTIALIAS).save('\\cache\\%s' % dst_file, quality=quality)
         current_path = os.getcwd()
-        cache_path = current_path + '\\cache\\'
-        print('&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&7')
-        print(cache_path)
-        print('&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&7')
-        im.resize((width, height), Image.ANTIALIAS).save(cache_path+dst_file, quality=quality)
+        cache_path = current_path + '\\cache\\'  # 缓存路径
+        im.resize((width, height), Image.ANTIALIAS).save(cache_path+dst_file, quality=quality)  # 保存缩略图
     else:
         if os.path.isfile(src_file):
             shutil.copyfile(src_file, dst_file)
@@ -315,13 +303,14 @@ if __name__ == '__main__':
     print('begin...')
 
     # setup redis
-    r = setup_redis_client(REDIS_CLIENT_IP, REDIS_CLIENT_PORT, REDIS_CLIENT_DB)                       # 截图数据缓存
+    r = setup_redis_client(REDIS_CLIENT_IP, REDIS_CLIENT_PORT, REDIS_CLIENT_DB)  # 截图数据缓存
 
     # setup baidu api client
     baidu_client = setup_baidu_client(BAIDU_APP_ID, BAIDU_API_KEY, BAIDU_APP_SECRET_KEY)
 
     # get token & color
     token, start_color, end_color = get_token_from_server(DEVICE_INFO_PREFIX, DEV_NO, APP_ID, APP_SECRET)
+
     # 从server获取人脸数据库,以及是否需要向百度api更新人脸数据库
     print('***************************')
     face_infos, need_to_upload_face_lib = get_face_infos_from_server(DOWNLOAD_FACE_PREFIX, DEV_NO, token)
@@ -345,15 +334,15 @@ if __name__ == '__main__':
             print('detect_count_time %d, get token again, time %s' % (detect_count_time, nowTime))
             token, start_color, end_color = get_token_from_server(DEVICE_INFO_PREFIX, DEV_NO, APP_ID, APP_SECRET)
 
-        peoples = r.smembers(PEOPLES_INDEX_SET_NAME)                                 # 从redis获取是否有新的检测数据
+        peoples = r.smembers(PEOPLES_INDEX_SET_NAME)  # 从redis获取是否有新的检测数据
         for people in peoples:
             flags = True
 
-            people_str = people.decode('utf-8')                                      # 关键字,key,time值, 1534038575
-            localtime = time.asctime(time.localtime(float(people_str)))              # 转换成本地时间字符串
+            people_str = people.decode('utf-8')  # 关键字,key,time值, 1534038575
+            localtime = time.asctime(time.localtime(float(people_str)))  # 转换成本地时间字符串
 
             people_detect_count_str = PEOPLE_INFO_PREFIX + people_str
-            people_detect_count = int(r.get(people_detect_count_str))                # 获取截图数量
+            people_detect_count = int(r.get(people_detect_count_str))  # 获取截图数量
 
             print('\nprocess people: time %s, %s, detect count %d' % (people_str, localtime, people_detect_count))
 
@@ -383,19 +372,22 @@ if __name__ == '__main__':
                 pic_file_name = r.hget(people_info_str, 'pic').decode('utf-8')                 # 获取截图文件名称
                 pic_face_file_name = r.hget(people_info_str, 'pic_face').decode('utf-8')       # 获取人脸截图文件名称, TODO
                 color_str = r.hget(people_info_str, 'color_str').decode('utf-8')               # 获取识别的衣服颜色
-                color_b = r.hget(people_info_str, 'color_b').decode('utf-8')                   # 获取识别的衣服颜色, BGR值
+                # 获取识别的衣服颜色, BGR值
+                color_b = r.hget(people_info_str, 'color_b').decode('utf-8')
                 color_g = r.hget(people_info_str, 'color_g').decode('utf-8')
                 color_r = r.hget(people_info_str, 'color_r').decode('utf-8')
-
-                face_x = r.hget(people_info_str, 'face_x').decode('utf-8')          # 获取人脸位置
+                # 获取人脸位置
+                face_x = r.hget(people_info_str, 'face_x').decode('utf-8')
                 face_y = r.hget(people_info_str, 'face_y').decode('utf-8')
                 face_w = r.hget(people_info_str, 'face_w').decode('utf-8')
                 face_h = r.hget(people_info_str, 'face_h').decode('utf-8')
-                body_x = r.hget(people_info_str, 'body_x').decode('utf-8')          # 获取人行位置
+                # 获取人行位置
+                body_x = r.hget(people_info_str, 'body_x').decode('utf-8')
                 body_y = r.hget(people_info_str, 'body_y').decode('utf-8')
                 body_w = r.hget(people_info_str, 'body_w').decode('utf-8')
                 body_h = r.hget(people_info_str, 'body_h').decode('utf-8')
-                suit_x = r.hget(people_info_str, 'suit_x').decode('utf-8')          # 获取衣服位置
+                # 获取衣服位置
+                suit_x = r.hget(people_info_str, 'suit_x').decode('utf-8')
                 suit_y = r.hget(people_info_str, 'suit_y').decode('utf-8')
                 suit_w = r.hget(people_info_str, 'suit_w').decode('utf-8')
                 suit_h = r.hget(people_info_str, 'suit_h').decode('utf-8')
@@ -409,59 +401,60 @@ if __name__ == '__main__':
                       (pic_idx, pic_file_name, pic_face_file_name, color_str, color_b, color_g, color_r,
                        face_x, face_y, face_w, face_h, body_x, body_y, body_w, body_h, suit_x, suit_y, suit_w, suit_h,
                        status, score, sequence))
-
-                # 判断颜色是否符合要求
-                judge_color_idx = judge_color(start_color, end_color, color_b, color_g, color_r)
-                if judge_color_idx > 0:
-                    changingQualified = 1
-                    got_color_b = color_b
-                    got_color_g = color_g
-                    got_color_r = color_r
-                    got_color_str = color_str
-                    best_pic_idx = pic_idx                # best_pic_idx 设定为此截图的idx
-                    print('idx %d: color valid ok, assume it as the pickup idx' % best_pic_idx)
-                else:
-                    if changingQualified == 0:
+                if face_x + face_w > 1000 and face_x < 1700:
+                    # 判断颜色是否符合要求
+                    judge_color_idx = judge_color(start_color, end_color, color_b, color_g, color_r)
+                    if judge_color_idx > 0:
+                        changingQualified = 1
                         got_color_b = color_b
                         got_color_g = color_g
                         got_color_r = color_r
                         got_color_str = color_str
-                        best_pic_idx = pic_idx             # best_pic_idx 设定为此截图的idx
-                        print('idx %d: color not valid ok, but has color, assume it as the pickup idx' % best_pic_idx)
+                        best_pic_idx = pic_idx                # best_pic_idx 设定为此截图的idx
+                        print('idx %d: color valid ok, assume it as the pickup idx' % best_pic_idx)
+                    else:
+                        if changingQualified == 0:
+                            got_color_b = color_b
+                            got_color_g = color_g
+                            got_color_r = color_r
+                            got_color_str = color_str
+                            best_pic_idx = pic_idx             # best_pic_idx 设定为此截图的idx
+                            print('idx %d: color not valid ok, but has color, assume it as the pickup idx' % best_pic_idx)
 
-                if score_ok_flag == True:
+                    if score_ok_flag == True:
+                        continue
+
+                    # 从百度api查找截图是否包含人脸库中数据
+                    print('22222222222222222222222222222222222222222222222222222')
+                    user_list = search_face(baidu_client, groupId, pic_file_name)
+
+                    for user in user_list:  # 如果匹配到百度
+                        print('333333333333333333333333333333333333333333333333333333333')
+                        user_id = int(user['user_id'])
+                        score = float(user['score'])
+                        print('get user_face %d from pic %s, score %f' % (user_id, pic_file_name, score))
+                        r.hset(people_info_str, 'score', score)  # 更新上传缓存中的百度匹配分数
+                        for face_info in face_infos:
+                            if face_info['userId'] == user_id and score >= BAIDU_APP_FACE_SCORE_MAX:
+                                face_info['matchFaceCount'] = face_info['matchFaceCount'] + 1
+                                update_pic_idx_flag = False
+                                if face_info['maxFaceScore'] < score:
+                                    face_info['maxFaceScore'] = score
+                                    update_pic_idx_flag = True
+                                if max_face_match_count < face_info['matchFaceCount']:
+                                    max_face_match_count = face_info['matchFaceCount']
+                                    max_face_match_score = face_info['maxFaceScore']
+                                    if update_pic_idx_flag:
+                                        max_face_match_idx = pic_idx
+                                    qualifiedUser = user_id
+                                    faceQualified = 1
+                                if score >= BAIDU_APP_FACE_SCORE_OK:
+                                    score_ok_flag = True
+                                    print('score_ok %f, user id %d!, need no more detect face.' %
+                                          (max_face_match_score, qualifiedUser))
+                                    break
+                else:
                     continue
-
-                # 从百度api查找截图是否包含人脸库中数据
-                print('22222222222222222222222222222222222222222222222222222')
-                user_list = search_face(baidu_client, groupId, pic_file_name)
-
-                for user in user_list:  # 如果匹配到百度
-                    print('333333333333333333333333333333333333333333333333333333333')
-                    user_id = int(user['user_id'])
-                    score = float(user['score'])
-                    print('get user_face %d from pic %s, score %f' % (user_id, pic_file_name, score))
-                    r.hset(people_info_str, 'score', score)  # 更新上传缓存中的百度匹配分数
-                    for face_info in face_infos:
-                        if face_info['userId'] == user_id and score >= BAIDU_APP_FACE_SCORE_MAX:
-                            face_info['matchFaceCount'] = face_info['matchFaceCount'] + 1
-                            update_pic_idx_flag = False
-                            if face_info['maxFaceScore'] < score:
-                                face_info['maxFaceScore'] = score
-                                update_pic_idx_flag = True
-                            if max_face_match_count < face_info['matchFaceCount']:
-                                max_face_match_count = face_info['matchFaceCount']
-                                max_face_match_score = face_info['maxFaceScore']
-                                if update_pic_idx_flag:
-                                    max_face_match_idx = pic_idx
-                                qualifiedUser = user_id
-                                faceQualified = 1
-                            if score >= BAIDU_APP_FACE_SCORE_OK:
-                                score_ok_flag = True
-                                print('score_ok %f, user id %d!, need no more detect face.' %
-                                      (max_face_match_score, qualifiedUser))
-                                break
-
             if max_face_match_idx >= 0:
                 r.hmset(people_info_str, {'status': 1, 'score': max_face_match_score})
                 best_pic_idx = max_face_match_idx
